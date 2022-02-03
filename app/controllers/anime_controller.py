@@ -1,6 +1,7 @@
 from http import HTTPStatus
 import http
 from multiprocessing.context import set_spawning_popen
+from platform import release
 
 from flask import jsonify, request
 from app.models.anime_model import Anime
@@ -35,7 +36,7 @@ def create_anime():
                     "seasons"
                 ]
             }
-        ), HTTPStatus.BAD_REQUEST
+        ), HTTPStatus.UNPROCESSABLE_ENTITY
 
     for word in anime_request.get('anime').split(' '):
         if(len(formated_name) < len(anime_request.get('anime').split(' ')) -1):
@@ -110,7 +111,64 @@ def get_anime_by_id(anime_id):
 
 # update anime
 def update_anime(anime_id):
-    return 'update', HTTPStatus.OK
+
+    request_update_data = request.get_json()
+
+    formated_name = ''
+    name = request_update_data.get('anime')
+    released = request_update_data.get('released_date')
+    seasons = request_update_data.get('seasons')
+
+    if (name == None and released == None and seasons == None):
+            return jsonify(
+                {
+                    "available_keys": [
+                        "anime",
+                        "released_date",
+                        "seasons"
+                    ]
+                }
+        ), HTTPStatus.UNPROCESSABLE_ENTITY
+
+    if (name != None):
+        for word in request_update_data.get('anime').split(' '):
+            if(len(formated_name) < len(request_update_data.get('anime').split(' ')) -1):
+                formated_name  += word.capitalize() + ' '
+            else:
+                formated_name  += word.capitalize()
+        
+        query_to_update = f"update animes set anime='{formated_name}' where id={anime_id};;"
+        cur = conn.cursor()
+        cur.execute(query_to_update)
+        conn.commit()
+        cur.close()
+    
+    if (released != None):
+        query_to_update = f"update animes set released_date='{released}' where id={anime_id};;"
+        cur = conn.cursor()
+        cur.execute(query_to_update)
+        conn.commit()
+        cur.close()
+    
+    if (seasons != None):
+        query_to_update = f"update animes set seasons='{seasons}' where id={anime_id};;"
+        cur = conn.cursor()
+        cur.execute(query_to_update)
+        conn.commit()
+        cur.close()
+
+    query_to_get_animes = "SELECT * FROM animes;"
+    cur = conn.cursor()
+    cur.execute(query_to_get_animes)
+    animes = cur.fetchall()
+    anime_keys = ['id', 'anime', 'released_date', 'seasons']
+    animes_list = [dict(zip(anime_keys, ani)) for ani in animes]
+
+    for anime in animes_list:
+        if (anime['id'] == anime_id):
+            return {"data": [(anime)]}, HTTPStatus.OK
+
+    return {"error": "not found"}, HTTPStatus.NOT_FOUND
 
 # delete anime
 def delete_anime(anime_id):
@@ -128,5 +186,5 @@ def delete_anime(anime_id):
             cur.execute(query_to_delete_anime)
             conn.commit()
             cur.close()
-            return '', HTTPStatus.OK
+            return '', HTTPStatus.NO_CONTENT
     return {'error': 'not found'}, HTTPStatus.NOT_FOUND
